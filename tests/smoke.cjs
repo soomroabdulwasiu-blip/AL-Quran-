@@ -1,0 +1,15 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const data = new Map();
+const app = {innerHTML:''};
+const body = {classList:{toggle(){}}};
+const sandbox = {document:{querySelector(s){return s==='#app'?app:null},querySelectorAll(){return []},body,addEventListener(){}},localStorage:{getItem(k){return data.has(k)?data.get(k):null},setItem(k,v){data.set(k,v)}},fetch:async()=>{throw Error('offline')},window:{scrollTo(){}},console,alert(){}};
+vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync('app/src/main/assets/app.js','utf8'),sandbox);
+assert.match(app.innerHTML,/Assalamu alaikum/);
+assert.equal(vm.runInContext(`escapeHTML('<script>')`,sandbox),'&lt;script&gt;');
+vm.runInContext(`store.set('x',{value:42})`,sandbox);
+assert.equal(vm.runInContext(`store.get('x',{}).value`,sandbox),42);
+vm.runInContext(`store.set('cache.fixture',{ok:true})`,sandbox);
+(async()=>{assert.equal((await vm.runInContext(`request('surah','fixture')`,sandbox)).ok,true);await assert.rejects(vm.runInContext(`request('surah','missing')`,sandbox),/Connect to the internet/);console.log('UI initialization, escaping, persistence, and offline fallback checks passed.');})().catch(e=>{console.error(e);process.exitCode=1});
